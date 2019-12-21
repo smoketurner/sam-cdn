@@ -1,0 +1,4 @@
+.git
+.aws-sam
+coverage
+node_modules

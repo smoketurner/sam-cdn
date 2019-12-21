@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: >-
+  AWS SAM project to deploy a CDN for hosting static assets in private S3 buckets
+
+Parameters:
+  DomainName:
+    Type: String
+    Description: Domain name to use
+
+Resources:
+
+  DefaultIndexLambdaFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: src/handlers/default_index/
+      Handler: index.handler
+      Runtime: nodejs10.x
+      MemorySize: 128 # megabytes
+      Timeout: 1 # secondes
+      Description: CloudFront origin-request default index handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  WebSecurityLambdaFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: src/handlers/web_security/
+      Handler: index.handler
+      Runtime: nodejs10.x
+      MemorySize: 128 # megabytes
+      Timeout: 1 # secondes
+      Description: CloudFront origin-response web security handler
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  WebCertificate:
+    Type: "AWS::CertificateManager::Certificate"
+    Properties:
+      DomainName: "${self:custom.config.domain}"
+      SubjectAlternativeNames:
+        - "*.${self:custom.config.domain}"
+      ValidationMethod: DNS
+      Tags:
+        - Key: Name
+          Value: "${self:custom.config.domain}"
+        - Key: STAGE
+          Value: "${self:provider.stage}"

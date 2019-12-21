@@ -1,0 +1,5 @@
+{
+  "collectCoverage": true,
+  "testEnvironment": "node",
+  "verbose": false
+}
