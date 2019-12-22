@@ -1,5 +1,5 @@
 const wrapper = require('lambda-wrapper');
-const handler = require('../../functions/web_security');
+const handler = require('../../src/handlers/web_security/index');
 
 const lambda = wrapper.wrap(handler);
 

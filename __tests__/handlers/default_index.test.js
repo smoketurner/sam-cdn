@@ -1,5 +1,5 @@
 const wrapper = require('lambda-wrapper');
-const handler = require('../../functions/default_index');
+const handler = require('../../src/handlers/default_index/index');
 
 const lambda = wrapper.wrap(handler);
 
