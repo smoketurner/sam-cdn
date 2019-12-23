@@ -1,7 +1,22 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
-Description: >-
+Description: >
   AWS SAM project to deploy a CDN for hosting static assets in private S3 buckets
+
+Metadata:
+  'AWS::ServerlessRepo::Application':
+    Name: cloudfront-cdn
+    Description: >
+      AWS SAM project to deploy a CDN for hosting static assets in private S3 buckets
+      Includes: S3 buckets, CloudFront distributions, Route53 record sets
+    Author: Smoke Turner, LLC
+    SpdxLicenseId: MIT
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    Labels: ['cdn', 'cloudfront', 'route53', 's3']
+    HomePageUrl: https://github.com/smoketurner/sam-cdn
+    SemanticVersion: 1.0.0
+    SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
 Parameters:
   DomainName:
@@ -35,6 +50,10 @@ Parameters:
 Conditions:
   CreateRedirect: !Not [!Equals [!Ref CreateRedirect, 'false']]
 
+Globals:
+  Function:
+    Timeout: 60
+
 Resources:
   CloudFrontLambdaRole:
     Type: 'AWS::IAM::Role'
@@ -49,7 +68,7 @@ Resources:
                 - 'edgelambda.amazonaws.com'
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
-        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - !Sub 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
 
   DefaultIndexLambdaFunction:
     Type: 'AWS::Serverless::Function'
@@ -132,7 +151,7 @@ Resources:
             Principal:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
             Action: 's3:GetObject'
-            Resource: !Sub 'arn:${AWS::Partition}:s3:::${WebBucket}/*'
+            Resource: !Join ['/', [!GetAtt WebBucket.Arn, '*']]
 
   RedirectBucket:
     Type: 'AWS::S3::Bucket'
