@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "build": "sam build --region us-east-1",
+    "deploy": "sam deploy --guided"
   },
   "dependencies": {},
   "devDependencies": {

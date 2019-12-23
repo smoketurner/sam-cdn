@@ -6,6 +6,7 @@ Description: >-
 Parameters:
   DomainName:
     Type: String
+    Default: 'example.com'
     Description: Domain name to use
   HostedZoneId:
     Type: 'AWS::Route53::HostedZone::Id'
@@ -16,7 +17,7 @@ Parameters:
     Description: URI path to route to API
   ApiOriginDomainName:
     Type: String
-    Default: 'api.<domain>'
+    Default: 'api.example.com'
     Description: API origin domain name
   ApiOriginPath:
     Type: String
@@ -36,7 +37,7 @@ Conditions:
 
 Resources:
   CloudFrontLambdaRole:
-    Type: AWS::IAM::Role
+    Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -48,7 +49,7 @@ Resources:
                 - 'edgelambda.amazonaws.com'
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
-        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
 
   DefaultIndexLambdaFunction:
     Type: 'AWS::Serverless::Function'
@@ -124,14 +125,14 @@ Resources:
   WebBucketPolicy:
     Type: 'AWS::S3::BucketPolicy'
     Properties:
-      Bucket: !Ref: WebBucket
+      Bucket: !Ref WebBucket
       PolicyDocument:
         Statement:
           - Effect: Allow
             Principal:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
             Action: 's3:GetObject'
-            Resource: !Sub 'arn:aws:s3:::${WebBucket}/*'
+            Resource: !Sub 'arn:${AWS::Partition}:s3:::${WebBucket}/*'
 
   RedirectBucket:
     Type: 'AWS::S3::Bucket'
@@ -144,7 +145,7 @@ Resources:
               SSEAlgorithm: AES256
       WebsiteConfiguration:
         RedirectAllRequestsTo:
-          HostName: !Ref: WebBucket
+          HostName: !Ref WebBucket
           Protocol: https
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true

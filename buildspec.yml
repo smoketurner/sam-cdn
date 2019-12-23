@@ -2,12 +2,17 @@ version: 0.2
 
 phases:
   install:
+    runtime-versions:
+      - nodejs: 10
     commands:
-      - npm install
+      - npm ci
   pre_build:
     commands:
       - npm test
   build:
+    commands:
+      - npm run build
+  post_build:
     commands:
       - aws cloudformation package --template template.yml --s3-bucket $S3_BUCKET --output-template template-export.yml
 
@@ -16,4 +21,6 @@ artifacts:
   files:
     - template-export.yml
 
-
+cache:
+  paths:
+    - node_modules/**/*
