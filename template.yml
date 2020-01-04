@@ -9,13 +9,13 @@ Metadata:
     Description: >
       AWS SAM project to deploy a CDN for hosting static assets in private S3 buckets
       Includes: S3 buckets, CloudFront distributions, Route53 record sets
-    Author: Smoke Turner, LLC
+    Author: smoketurner
     SpdxLicenseId: MIT
     LicenseUrl: LICENSE
     ReadmeUrl: README.md
     Labels: ['cdn', 'cloudfront', 'route53', 's3']
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 1.0.0
+    SemanticVersion: 1.0.1
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
 Parameters:
@@ -81,6 +81,11 @@ Resources:
       Timeout: 1 # secondes
       Description: CloudFront origin-request default index handler
 
+  DefaultIndexLambdaVersion:
+    Type: 'AWS::Lambda::Version'
+    Properties:
+      FunctionName: !Ref DefaultIndexLambdaFunction
+
   WebSecurityLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
@@ -91,6 +96,11 @@ Resources:
       MemorySize: 128 # megabytes
       Timeout: 1 # secondes
       Description: CloudFront origin-response web security handler
+
+  WebSecurityLambdaVersion:
+    Type: 'AWS::Lambda::Version'
+    Properties:
+      FunctionName: !Ref WebSecurityLambdaFunction
 
   WebCertificate:
     Type: 'AWS::CertificateManager::Certificate'
@@ -224,9 +234,9 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
           LambdaFunctionAssociations:
             - EventType: 'origin-request'
-              LambdaFunctionARN: !GetAtt DefaultIndexLambdaFunction.FunctionArn
+              LambdaFunctionARN: !Ref DefaultIndexLambdaVersion
             - EventType: 'origin-response'
-              LambdaFunctionARN: !GetAtt WebSecurityLambdaFunction.FunctionArn
+              LambdaFunctionARN: !Ref WebSecurityLambdaVersion
         DefaultRootObject: 'index.html'
         Enabled: true
         HttpVersion: http2

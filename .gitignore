@@ -1,3 +1,4 @@
 .aws-sam
 node_modules
 coverage
+packaged.yml
