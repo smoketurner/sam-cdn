@@ -15,7 +15,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ['cdn', 'cloudfront', 'route53', 's3']
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 1.0.1
+    SemanticVersion: 1.0.2
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
 Parameters:
@@ -52,7 +52,11 @@ Conditions:
 
 Globals:
   Function:
-    Timeout: 60
+    Handler: index.handler
+    Runtime: nodejs10.x
+    MemorySize: 128 # megabytes
+    Timeout: 1 # secondes
+    AutoPublishAlias: live
 
 Resources:
   CloudFrontLambdaRole:
@@ -68,39 +72,21 @@ Resources:
                 - 'edgelambda.amazonaws.com'
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
-        - !Sub 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
 
   DefaultIndexLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
       CodeUri: src/handlers/default_index/
-      Handler: index.handler
-      Runtime: nodejs10.x
       Role: !GetAtt CloudFrontLambdaRole.Arn
-      MemorySize: 128 # megabytes
-      Timeout: 1 # secondes
       Description: CloudFront origin-request default index handler
-
-  DefaultIndexLambdaVersion:
-    Type: 'AWS::Lambda::Version'
-    Properties:
-      FunctionName: !Ref DefaultIndexLambdaFunction
 
   WebSecurityLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
       CodeUri: src/handlers/web_security/
-      Handler: index.handler
-      Runtime: nodejs10.x
       Role: !GetAtt CloudFrontLambdaRole.Arn
-      MemorySize: 128 # megabytes
-      Timeout: 1 # secondes
       Description: CloudFront origin-response web security handler
-
-  WebSecurityLambdaVersion:
-    Type: 'AWS::Lambda::Version'
-    Properties:
-      FunctionName: !Ref WebSecurityLambdaFunction
 
   WebCertificate:
     Type: 'AWS::CertificateManager::Certificate'
@@ -234,9 +220,9 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
           LambdaFunctionAssociations:
             - EventType: 'origin-request'
-              LambdaFunctionARN: !Ref DefaultIndexLambdaVersion
+              LambdaFunctionARN: !Ref DefaultIndexLambdaFunction.Version
             - EventType: 'origin-response'
-              LambdaFunctionARN: !Ref WebSecurityLambdaVersion
+              LambdaFunctionARN: !Ref WebSecurityLambdaFunction.Version
         DefaultRootObject: 'index.html'
         Enabled: true
         HttpVersion: http2

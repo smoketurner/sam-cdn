@@ -1,5 +1,6 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/smoketurner/sam-cdn/master/LICENSE)
 [![build status](https://github.com/smoketurner/sam-cdn/workflows/Node%20CI/badge.svg)](https://github.com/smoketurner/sam-cdn/actions?query=workflow%3A%22Node+CI%22)
+[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/lambda/home?#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:860114833029:applications/cloudfront-cdn)
 
 [AWS Serverless Application Model](https://aws.amazon.com/serverless/sam/) project that deploys a content delivery network (CDN) using AWS CloudFront for static assets hosted in a private S3 bucket.
 
