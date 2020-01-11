@@ -1,5 +1,6 @@
 {
   "collectCoverage": true,
   "testEnvironment": "node",
-  "verbose": false
+  "verbose": false,
+  "modulePaths": ["<rootDir>/src/handlers/"]
 }
