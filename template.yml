@@ -46,6 +46,9 @@ Parameters:
     Type: String
     Default: 'true'
     Description: Set to 'false' to not create the redirect CloudFront distribution
+    AllowedValues:
+      - 'true'
+      - 'false'
 
 Conditions:
   CreateRedirect: !Not [!Equals [!Ref CreateRedirect, 'false']]
