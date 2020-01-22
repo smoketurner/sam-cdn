@@ -15,8 +15,27 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ['cdn', 'cloudfront', 'route53', 's3']
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 1.0.2
+    SemanticVersion: 1.1.0
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
+
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: 'Domain Configuration'
+        Parameters:
+          - DomainName
+          - HostedZoneId
+          - CreateRedirect
+      - Label:
+          default: 'API Origin Configuration'
+        Parameters:
+          - ApiPath
+          - ApiOriginDomainName
+          - ApiOriginPath
+          - ApiOriginKey
+    ParameterLabels:
+      CreateRedirect:
+        default: 'Redirect http(s)://www.<domain> to https://domain?'
 
 Parameters:
   DomainName:
@@ -60,35 +79,27 @@ Globals:
     MemorySize: 128 # megabytes
     Timeout: 1 # secondes
     AutoPublishAlias: live
+    AssumeRolePolicyDocument:
+      Version: '2012-10-17'
+      Statement:
+        - Effect: 'Allow'
+          Principal:
+            Service:
+              - 'lambda.amazonaws.com'
+              - 'edgelambda.amazonaws.com'
+          Action: 'sts:AssumeRole'
 
 Resources:
-  CloudFrontLambdaRole:
-    Type: 'AWS::IAM::Role'
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - 'lambda.amazonaws.com'
-                - 'edgelambda.amazonaws.com'
-            Action: 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
-
   DefaultIndexLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
       CodeUri: src/handlers/default_index/
-      Role: !GetAtt CloudFrontLambdaRole.Arn
       Description: CloudFront origin-request default index handler
 
   WebSecurityLambdaFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
       CodeUri: src/handlers/web_security/
-      Role: !GetAtt CloudFrontLambdaRole.Arn
       Description: CloudFront origin-response web security handler
 
   WebCertificate:
