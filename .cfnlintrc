@@ -1,0 +1,6 @@
+templates:
+- template.yml
+include_checks:
+- I
+regions:
+- us-east-1

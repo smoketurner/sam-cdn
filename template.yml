@@ -156,7 +156,7 @@ Resources:
       BucketName: !Ref DomainName
       LoggingConfiguration:
         DestinationBucketName: !Ref LogBucket
-        LogFilePrefix: !Sub "AWSLogs/${AWS::AccountId}/S3/${DomainName/"
+        LogFilePrefix: !Sub "AWSLogs/${AWS::AccountId}/S3/${DomainName}/"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -364,7 +364,7 @@ Outputs:
     Description: CloudFront Distribution ID
     Value: !Ref CloudFrontDistribution
   CloudFrontDomainName:
-    Description: CloudFront `the The Domain Name
+    Description: CloudFront Domain Name
     Value: !GetAtt CloudFrontDistribution.DomainName
   CertificateArn:
     Description: SSL Certficate ARN
