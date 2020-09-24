@@ -13,4 +13,4 @@ max_line_length = 120
 quote_type = single
 
 [*.yml]
-quote_type = single
+quote_type = double

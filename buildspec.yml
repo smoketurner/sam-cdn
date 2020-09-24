@@ -14,13 +14,13 @@ phases:
       - npm run build
   post_build:
     commands:
-      - aws cloudformation package --template template.yml --s3-bucket $S3_BUCKET --output-template template-export.yml
+      - npm run package
 
 artifacts:
   type: zip
   files:
-    - template-export.yml
+    - packaged.yml
 
 cache:
   paths:
-    - node_modules/**/*
+    - "/root/.npm/**/*"
