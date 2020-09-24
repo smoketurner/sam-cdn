@@ -55,8 +55,8 @@ Parameters:
     Description: API origin domain name
   ApiOriginPath:
     Type: String
-    Default: "/"
-    Description: API origin path
+    Default: ""
+    Description: API origin path (must start with /)
   ApiOriginKey:
     Type: String
     Default: "NO_API_KEY_SET"
