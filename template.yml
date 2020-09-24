@@ -56,7 +56,7 @@ Parameters:
   ApiOriginPath:
     Type: String
     Default: ""
-    Description: API origin path (must start with /)
+    Description: API origin path (must start with "/")
   ApiOriginKey:
     Type: String
     Default: "NO_API_KEY_SET"
@@ -80,11 +80,6 @@ Rules:
 
 Globals:
   Function:
-    Handler: index.handler
-    Runtime: nodejs10.x
-    MemorySize: 128 # megabytes
-    Timeout: 1 # secondes
-    AutoPublishAlias: live
     AssumeRolePolicyDocument:
       Version: "2012-10-17"
       Statement:
@@ -94,6 +89,11 @@ Globals:
               - "lambda.amazonaws.com"
               - "edgelambda.amazonaws.com"
           Action: "sts:AssumeRole"
+    AutoPublishAlias: live
+    Handler: index.handler
+    MemorySize: 128 # megabytes
+    Runtime: nodejs12.x
+    Timeout: 1 # secondes
 
 Resources:
   DefaultIndexLambdaFunction:
@@ -327,14 +327,12 @@ Resources:
             DNSName: !GetAtt CloudFrontDistribution.DomainName
             EvaluateTargetHealth: false
             HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
-          HostedZoneId: !Ref HostedZoneId
           Name: !Ref DomainName
           Type: A
         - AliasTarget:
             DNSName: !GetAtt CloudFrontDistribution.DomainName
             EvaluateTargetHealth: false
             HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
-          HostedZoneId: !Ref HostedZoneId
           Name: !Ref DomainName
           Type: AAAA
 
@@ -348,14 +346,12 @@ Resources:
             DNSName: !GetAtt RedirectCloudFrontDistribution.DomainName
             EvaluateTargetHealth: false
             HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
-          HostedZoneId: !Ref HostedZoneId
           Name: !Sub "www.${DomainName}"
           Type: A
         - AliasTarget:
             DNSName: !GetAtt RedirectCloudFrontDistribution.DomainName
             EvaluateTargetHealth: false
             HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
-          HostedZoneId: !Ref HostedZoneId
           Name: !Sub "www.${DomainName}"
           Type: AAAA
 
