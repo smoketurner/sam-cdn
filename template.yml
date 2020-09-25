@@ -33,6 +33,10 @@ Metadata:
           - ApiOriginDomainName
           - ApiOriginPath
           - ApiOriginKey
+      - Label:
+          default: "AppSync Origin Configuration"
+        Parameters:
+          - AppSyncOriginDomainName
     ParameterLabels:
       CreateRedirect:
         default: "Redirect http(s)://www.<domain> to https://domain?"
@@ -52,7 +56,7 @@ Parameters:
   ApiOriginDomainName:
     Type: String
     Default: "api.example.com"
-    Description: API origin domain name
+    Description: API origin domain name (set to empty string to disable API origin)
   ApiOriginPath:
     Type: String
     Default: ""
@@ -61,6 +65,10 @@ Parameters:
     Type: String
     Default: "NO_API_KEY_SET"
     Description: x-api-key HTTP request header sent to API
+  AppSyncOriginDomainName:
+    Type: String
+    Default: ""
+    Description: AppSync origin domain name (will be available at /graphql)
   CreateRedirect:
     Type: String
     Default: "true"
@@ -70,13 +78,16 @@ Parameters:
       - "false"
 
 Conditions:
-  CreateRedirect: !Equals [!Ref CreateRedirect, "true"]
-
-Rules:
-  ValidateRegion:
-    Assertions:
-      - Assert: !Equals [!Ref "AWS::Region", "us-east-1"]
-        AssertDescription: "Can only be deployed in the us-east-1 region"
+  NorthernVirginiaRegion: !Equals [!Ref "AWS::Region", "us-east-1"]
+  CreateRedirect: !And
+    - !Condition NorthernVirginiaRegion
+    - !Equals [!Ref CreateRedirect, "true"]
+  HasApiOrigin: !And
+    - !Condition NorthernVirginiaRegion
+    - !Not [!Equals [!Ref ApiOriginDomainName, ""]]
+  HasAppSyncOrigin: !And
+    - !Condition NorthernVirginiaRegion
+    - !Not [!Equals [!Ref AppSyncOriginDomainName, ""]]
 
 Globals:
   Function:
@@ -98,12 +109,14 @@ Globals:
 Resources:
   DefaultIndexLambdaFunction:
     Type: "AWS::Serverless::Function"
+    Condition: NorthernVirginiaRegion
     Properties:
       CodeUri: src/handlers/default_index/
       Description: CloudFront origin-request default index handler
 
   WebSecurityLambdaFunction:
     Type: "AWS::Serverless::Function"
+    Condition: NorthernVirginiaRegion
     Properties:
       CodeUri: src/handlers/web_security/
       Description: CloudFront origin-response web security handler
@@ -130,6 +143,7 @@ Resources:
 
   LogBucket:
     Type: "AWS::S3::Bucket"
+    Condition: NorthernVirginiaRegion
     Properties:
       AccessControl: LogDeliveryWrite
       BucketEncryption:
@@ -147,6 +161,7 @@ Resources:
 
   WebBucket:
     Type: "AWS::S3::Bucket"
+    Condition: NorthernVirginiaRegion
     Properties:
       AccessControl: Private
       BucketEncryption:
@@ -168,6 +183,7 @@ Resources:
 
   WebBucketPolicy:
     Type: "AWS::S3::BucketPolicy"
+    Condition: NorthernVirginiaRegion
     Properties:
       Bucket: !Ref WebBucket
       PolicyDocument:
@@ -202,28 +218,46 @@ Resources:
 
   CloudFrontDistribution:
     Type: "AWS::CloudFront::Distribution"
+    Condition: NorthernVirginiaRegion
     Properties:
       DistributionConfig:
         Aliases:
           - !Ref DomainName
         CacheBehaviors:
-          - AllowedMethods:
-              - GET
-              - HEAD
-              - OPTIONS
-              - PUT
-              - PATCH
-              - POST
-              - DELETE
-            CachedMethods:
-              - GET
-              - HEAD
-            CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
-            Compress: true
-            OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
-            PathPattern: !Sub "${ApiPath}*"
-            TargetOriginId: api
-            ViewerProtocolPolicy: redirect-to-https
+          - !If
+            - HasApiOrigin
+            - AllowedMethods:
+                - GET
+                - HEAD
+                - OPTIONS
+                - PUT
+                - PATCH
+                - POST
+                - DELETE
+              CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+              Compress: true
+              OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
+              PathPattern: !Sub "${ApiPath}*"
+              TargetOriginId: api
+              ViewerProtocolPolicy: redirect-to-https
+            - !Ref "AWS::NoValue"
+          - !If
+            - HasAppSyncOrigin
+            - AllowedMethods:
+                - GET
+                - HEAD
+                - OPTIONS
+                - PUT
+                - PATCH
+                - POST
+                - DELETE
+              CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+              Compress: true
+              OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
+              PathPattern: "/graphql*"
+              TargetOriginId: appsync
+              ViewerProtocolPolicy: redirect-to-https
+            - !Ref "AWS::NoValue"
         CustomErrorResponses:
           - ErrorCachingMinTTL: 0
             ErrorCode: 403
@@ -235,6 +269,9 @@ Resources:
             ResponsePagePath: "/index.html"
         DefaultCacheBehavior:
           AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
             - GET
             - HEAD
           CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
@@ -256,18 +293,32 @@ Resources:
           IncludeCookies: false
           Prefix: !Sub "AWSLogs/${AWS::AccountId}/CloudFront/"
         Origins:
-          - Id: api
-            ConnectionAttempts: 3 # default
-            ConnectionTimeout: 10 # seconds
-            DomainName: !Ref ApiOriginDomainName
-            OriginPath: !Ref ApiOriginPath
-            OriginCustomHeaders:
-              - HeaderName: "x-api-key"
-                HeaderValue: !Ref ApiOriginKey
-            CustomOriginConfig:
-              OriginProtocolPolicy: https-only
-              OriginSSLProtocols:
-                - "TLSv1.2"
+          - !If
+            - HasApiOrigin
+            - Id: api
+              ConnectionAttempts: 3 # default
+              ConnectionTimeout: 10 # seconds
+              DomainName: !Ref ApiOriginDomainName
+              OriginPath: !Ref ApiOriginPath
+              OriginCustomHeaders:
+                - HeaderName: "x-api-key"
+                  HeaderValue: !Ref ApiOriginKey
+              CustomOriginConfig:
+                OriginProtocolPolicy: https-only
+                OriginSSLProtocols:
+                  - "TLSv1.2"
+            - !Ref "AWS::NoValue"
+          - !If
+            - HasAppSyncOrigin
+            - Id: appsync
+              ConnectionAttempts: 3 # default
+              ConnectionTimeout: 10 # seconds
+              DomainName: !Ref AppSyncOriginDomainName
+              CustomOriginConfig:
+                OriginProtocolPolicy: https-only
+                OriginSSLProtocols:
+                  - "TLSv1.2"
+            - !Ref "AWS::NoValue"
           - Id: s3
             ConnectionAttempts: 3 # default
             ConnectionTimeout: 10 # seconds
@@ -314,12 +365,14 @@ Resources:
 
   CloudFrontOriginAccessIdentity:
     Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
+    Condition: NorthernVirginiaRegion
     Properties:
       CloudFrontOriginAccessIdentityConfig:
         Comment: "CloudFront OAI"
 
   WebRecordSetGroup:
     Type: "AWS::Route53::RecordSetGroup"
+    Condition: NorthernVirginiaRegion
     Properties:
       HostedZoneId: !Ref HostedZoneId
       RecordSets:
@@ -359,9 +412,11 @@ Outputs:
   CloudFrontDistributionId:
     Description: CloudFront Distribution ID
     Value: !Ref CloudFrontDistribution
+    Condition: NorthernVirginiaRegion
   CloudFrontDomainName:
     Description: CloudFront Domain Name
     Value: !GetAtt CloudFrontDistribution.DomainName
+    Condition: NorthernVirginiaRegion
   CertificateArn:
     Description: SSL Certficate ARN
     Value: !Ref WebCertificate
