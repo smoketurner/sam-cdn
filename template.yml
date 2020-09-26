@@ -15,7 +15,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ["cdn", "cloudfront", "route53", "s3"]
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 1.3.0
+    SemanticVersion: 1.3.1
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
   "AWS::CloudFormation::Interface":
@@ -234,9 +234,20 @@ Resources:
                 - PATCH
                 - POST
                 - DELETE
-              CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+              # CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
               Compress: true
-              OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
+              ForwardedValues:
+                Headers:
+                  - Accept
+                  - Authorization
+                  - Content-Type
+                  - Referer
+                QueryString: true
+              MaxTTL: 0
+              MinTTL: 0
+              DefaultTTL: 0
+              # Can't use Managed-AllViewer because it sends the Host header
+              # OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
               PathPattern: !Sub "${ApiPath}*"
               TargetOriginId: api
               ViewerProtocolPolicy: redirect-to-https
@@ -251,9 +262,20 @@ Resources:
                 - PATCH
                 - POST
                 - DELETE
-              CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+              # CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
               Compress: true
-              OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
+              ForwardedValues:
+                Headers:
+                  - Accept
+                  - Authorization
+                  - Content-Type
+                  - Referer
+                QueryString: true
+              MaxTTL: 0
+              MinTTL: 0
+              DefaultTTL: 0
+              # Can't use Managed-AllViewer because it sends the Host header
+              # OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
               PathPattern: "/graphql*"
               TargetOriginId: appsync
               ViewerProtocolPolicy: redirect-to-https
@@ -322,7 +344,7 @@ Resources:
           - Id: s3
             ConnectionAttempts: 3 # default
             ConnectionTimeout: 10 # seconds
-            DomainName: !GetAtt WebBucket.DomainName
+            DomainName: !GetAtt WebBucket.RegionalDomainName
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
         PriceClass: PriceClass_100
@@ -420,3 +442,27 @@ Outputs:
   CertificateArn:
     Description: SSL Certficate ARN
     Value: !Ref WebCertificate
+  WebBucketName:
+    Description: Web S3 Bucket Name
+    Value: !Ref WebBucket
+    Condition: NorthernVirginiaRegion
+  WebBucketArn:
+    Description: Web S3 Bucket ARN
+    Value: !GetAtt WebBucket.Arn
+    Condition: NorthernVirginiaRegion
+  WebBucketDomainName:
+    Description: Web S3 Bucket Domain Name
+    Value: !GetAtt WebBucket.RegionalDomainName
+    Condition: NorthernVirginiaRegion
+  LogBucketName:
+    Description: Log S3 Bucket Name
+    Value: !Ref LogBucket
+    Condition: NorthernVirginiaRegion
+  LogBucketArn:
+    Description: Log S3 Bucket ARN
+    Value: !GetAtt LogBucket.Arn
+    Condition: NorthernVirginiaRegion
+  LogBucketDomainName:
+    Description: Log S3 Bucket Domain Name
+    Value: !GetAtt LogBucket.RegionalDomainName
+    Condition: NorthernVirginiaRegion
