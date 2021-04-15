@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test": "jest --coverage",
-    "build": "sam build --region us-east-1",
+    "build": "sam build --region us-east-1 --cached --parallel",
     "deploy": "sam deploy --guided",
     "package": "sam package --template-file template.yml --output-template-file packaged.yml --s3-bucket smoketurner-sam",
     "publish": "sam publish --template packaged.yml --region us-east-1"
