@@ -59,10 +59,16 @@ describe('web_security', () => {
         {
           key: 'Feature-Policy',
           value:
-            'geolocation none; midi none; notifications none; push none; sync-xhr none; microphone none; camera none; magnetometer none; gyroscope none; speaker self; vibrate none; fullscreen self; payment none;',
+            'geolocation none; midi none; notifications none; push none; sync-xhr none; microphone none; camera none; magnetometer none; gyroscope none; speaker self; vibrate none; fullscreen self; payment none;', // eslint-disable-line max-len
         },
       ]);
-      expect.assertions(7);
+      expect(actual.headers['Permissions-Policy']).toEqual([
+        {
+          key: 'Permissions-Policy',
+          value: 'interest-cohort=()',
+        },
+      ]);
+      expect.assertions(8);
     });
   });
 });

@@ -52,11 +52,35 @@ exports.handler = async (event, context) => {
     },
   ];
 
+  const policies = [
+    'geolocation none',
+    'midi none',
+    'notifications none',
+    'push none',
+    'sync-xhr none',
+    'microphone none',
+    'camera none',
+    'magnetometer none',
+    'gyroscope none',
+    'speaker self',
+    'vibrate none',
+    'fullscreen self',
+    'payment none',
+  ];
+
   headers['Feature-Policy'] = [
     {
       key: 'Feature-Policy',
-      value:
-        'geolocation none; midi none; notifications none; push none; sync-xhr none; microphone none; camera none; magnetometer none; gyroscope none; speaker self; vibrate none; fullscreen self; payment none;',
+      value: `${policies.join('; ')};`,
+    },
+  ];
+
+  // opt-out of Google Chrome's FLoC
+  // @see https://plausible.io/blog/google-floc#how-to-opt-out-of-floc-as-a-web-developer-set-a-permissions-policy
+  headers['Permissions-Policy'] = [
+    {
+      key: 'Permissions-Policy',
+      value: 'interest-cohort=()',
     },
   ];
 
