@@ -1,7 +1,0 @@
-{
-  "collectCoverage": true,
-  "testEnvironment": "node",
-  "verbose": false,
-  "modulePaths": ["<rootDir>/src/handlers/"],
-  "modulePathIgnorePatterns": ["<rootDir>/.aws-sam/build"]
-}

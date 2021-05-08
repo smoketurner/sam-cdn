@@ -1,13 +1,12 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Transform: "AWS::Serverless-2016-10-31"
 Description: >
-  AWS SAM project to deploy a CDN for hosting static assets in private S3 buckets
+  AWS project to deploy a CDN for hosting static assets in private S3 buckets
 
 Metadata:
   "AWS::ServerlessRepo::Application":
     Name: cloudfront-cdn
     Description: >
-      AWS SAM project to deploy a CDN for hosting static assets in private S3 buckets
+      AWS project to deploy a CDN for hosting static assets in private S3 buckets
       Includes: S3 buckets, CloudFront distributions, Route53 record sets
     Author: smoketurner
     SpdxLicenseId: MIT
@@ -15,7 +14,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ["cdn", "cloudfront", "route53", "s3"]
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 1.3.2
+    SemanticVersion: 2.0.0
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
   "AWS::CloudFormation::Interface":
@@ -26,6 +25,7 @@ Metadata:
           - DomainName
           - HostedZoneId
           - CreateRedirect
+          - LogRetentionDays
       - Label:
           default: "API Origin Configuration"
         Parameters:
@@ -39,16 +39,17 @@ Metadata:
           - AppSyncOriginDomainName
     ParameterLabels:
       CreateRedirect:
-        default: "Redirect http(s)://www.<domain> to https://domain?"
+        default: "Redirect http(s)://www.<DomainName> to https://<DomainName>?"
 
 Parameters:
   DomainName:
     Type: String
-    Default: "example.com"
-    Description: Domain name to use
+    Default: ""
+    Description: Optional domain name to use (leave blank for *.cloudfront.net)
   HostedZoneId:
-    Type: "AWS::Route53::HostedZone::Id"
+    Type: String
     Description: HostedZoneId for the Domain
+    Default: ""
   ApiPath:
     Type: String
     Default: "/api"
@@ -71,58 +72,125 @@ Parameters:
     Description: AppSync origin domain name (will be available at /graphql)
   CreateRedirect:
     Type: String
-    Default: "true"
-    Description: Set to 'false' to not create the redirect CloudFront distribution
+    Default: "false"
+    Description: Set to 'true' to create a CloudFront distribution that redirects https://www.DomainName to https://DomainName
     AllowedValues:
       - "true"
       - "false"
+  LogRetentionDays:
+    Type: Number
+    Default: 30
+    Description: Number of days to retain access logs
 
 Conditions:
-  NorthernVirginiaRegion: !Equals [!Ref "AWS::Region", "us-east-1"]
+  HasDomainName: !Not [!Equals [!Ref DomainName, ""]]
   CreateRedirect: !And
-    - !Condition NorthernVirginiaRegion
+    - !Condition HasDomainName
     - !Equals [!Ref CreateRedirect, "true"]
-  HasApiOrigin: !And
-    - !Condition NorthernVirginiaRegion
-    - !Not [!Equals [!Ref ApiOriginDomainName, ""]]
-  HasAppSyncOrigin: !And
-    - !Condition NorthernVirginiaRegion
-    - !Not [!Equals [!Ref AppSyncOriginDomainName, ""]]
+  HasApiOrigin: !Not [!Equals [!Ref ApiOriginDomainName, ""]]
+  HasAppSyncOrigin: !Not [!Equals [!Ref AppSyncOriginDomainName, ""]]
 
-Globals:
-  Function:
-    AssumeRolePolicyDocument:
-      Version: "2012-10-17"
-      Statement:
-        - Effect: "Allow"
-          Principal:
-            Service:
-              - "lambda.amazonaws.com"
-              - "edgelambda.amazonaws.com"
-          Action: "sts:AssumeRole"
-    AutoPublishAlias: live
-    Handler: index.handler
-    MemorySize: 128 # megabytes
-    Runtime: nodejs12.x
-    Timeout: 1 # secondes
+Rules:
+  ValidateRegion:
+    Assertions:
+      - Assert: !Equals [!Ref "AWS::Region", "us-east-1"]
+        AssertDescription: Region must be us-east-1
+  ValidateHostedZone:
+    RuleCondition: !Not [!Equals [!Ref DomainName, ""]]
+    Assertions:
+      - Assert: !Not [!Equals [!Ref HostedZoneId, ""]]
+        AssertDescription: HostedZoneId is required if DomainName provided
 
 Resources:
-  DefaultIndexLambdaFunction:
-    Type: "AWS::Serverless::Function"
-    Condition: NorthernVirginiaRegion
+  DefaultIndexFunction:
+    Type: "AWS::CloudFront::Function"
     Properties:
-      CodeUri: src/handlers/default_index/
-      Description: CloudFront origin-request default index handler
+      AutoPublish: true
+      FunctionCode: |-
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
 
-  WebSecurityLambdaFunction:
-    Type: "AWS::Serverless::Function"
-    Condition: NorthernVirginiaRegion
+          // Check whether the URI is missing a file name.
+          if (uri.endsWith('/')) {
+            request.uri += 'index.html';
+          }
+          // Check whether the URI is missing a file extension.
+          else if (!uri.includes('.')) {
+            request.uri += '/index.html';
+          }
+
+          return request;
+        }
+      FunctionConfig:
+        Comment: Viewer Request - Default Index
+        Runtime: cloudfront-js-1.0
+      Name: default_index
+
+  WebSecurityFunction:
+    Type: "AWS::CloudFront::Function"
     Properties:
-      CodeUri: src/handlers/web_security/
-      Description: CloudFront origin-response web security handler
+      AutoPublish: true
+      FunctionCode: |-
+        function handler(event) {
+          var response = event.response;
+          var headers = response.headers;
+
+          var policies = [
+            'autoplay none',
+            'camera none',
+            'fullscreen self',
+            'geolocation none',
+            'gyroscope none',
+            'magnetometer none',
+            'midi none',
+            'microphone none',
+            'notifications none',
+            'payment none',
+            'push none',
+            'speaker self',
+            'sync-xhr none',
+            'vibrate none'
+          ];
+
+          headers['strict-transport-security'] = {
+            value: 'max-age=63072000; includeSubDomains; preload'
+          };
+          headers['content-security-policy'] = {
+            value: "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'"
+          };
+          headers['x-content-type-options'] = {
+            value: 'nosniff'
+          };
+          headers['referrer-policy'] = {
+            value: 'strict-origin-when-cross-origin'
+          };
+          headers['feature-policy'] = {
+            value: policies.join('; ')
+          };
+          headers['x-frame-options'] = {
+            value: 'DENY'
+          };
+          headers['x-xss-protection'] = {
+            value: '1; mode=block'
+          };
+
+          // opt-out of Google Chrome's FLoC
+          // @see https://plausible.io/blog/google-floc#how-to-opt-out-of-floc-as-a-web-developer-set-a-permissions-policy
+          headers['permissions-policy'] = {
+            value: 'interest-cohort=()'
+          };
+
+          return response;
+        }
+      FunctionConfig:
+        Comment: Viewer Response - Web Security
+        Runtime: cloudfront-js-1.0
+      Name: web_security
 
   WebCertificate:
     Type: "AWS::CertificateManager::Certificate"
+    Condition: HasDomainName
     Properties:
       CertificateTransparencyLoggingPreference: ENABLED
       DomainName: !Ref DomainName
@@ -143,13 +211,23 @@ Resources:
 
   LogBucket:
     Type: "AWS::S3::Bucket"
-    Condition: NorthernVirginiaRegion
     Properties:
       AccessControl: LogDeliveryWrite
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+            ExpirationInDays: !Ref LogRetentionDays
+            Id: RetentionRule
+            NoncurrentVersionExpirationInDays: !Ref LogRetentionDays
+            Status: Enabled
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -158,20 +236,30 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName} Logs"
+      VersioningConfiguration:
+        Status: Suspended
 
   WebBucket:
     Type: "AWS::S3::Bucket"
-    Condition: NorthernVirginiaRegion
     Properties:
       AccessControl: Private
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
-      BucketName: !Ref DomainName
+      BucketName: !If
+        - HasDomainName
+        - !Ref DomainName
+        - !Sub "web-${AWS::AccountId}-${AWS::Region}"
       LoggingConfiguration:
         DestinationBucketName: !Ref LogBucket
-        LogFilePrefix: !Sub "AWSLogs/${AWS::AccountId}/S3/${DomainName}/"
+        LogFilePrefix: !If
+          - HasDomainName
+          - !Sub "AWSLogs/${AWS::AccountId}/S3/${DomainName}/"
+          - !Sub "AWSLogs/${AWS::AccountId}/S3/web-${AWS::AccountId}-${AWS::Region}/"
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -179,11 +267,15 @@ Resources:
         RestrictPublicBuckets: true
       Tags:
         - Key: Name
-          Value: !Ref DomainName
+          Value: !If
+            - HasDomainName
+            - !Ref DomainName
+            - !Sub "web-${AWS::AccountId}-${AWS::Region}"
+      VersioningConfiguration:
+        Status: Enabled
 
   WebBucketPolicy:
     Type: "AWS::S3::BucketPolicy"
-    Condition: NorthernVirginiaRegion
     Properties:
       Bucket: !Ref WebBucket
       PolicyDocument:
@@ -193,6 +285,15 @@ Resources:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
             Action: "s3:GetObject"
             Resource: !Sub "${WebBucket.Arn}/*"
+          - Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Sub "${WebBucket.Arn}/*"
+              - !GetAtt WebBucket.Arn
+            Condition:
+              Bool:
+                "aws:SecureTransport": "false"
 
   RedirectBucket:
     Type: "AWS::S3::Bucket"
@@ -207,6 +308,9 @@ Resources:
         RedirectAllRequestsTo:
           HostName: !Ref WebBucket
           Protocol: https
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -218,11 +322,12 @@ Resources:
 
   CloudFrontDistribution:
     Type: "AWS::CloudFront::Distribution"
-    Condition: NorthernVirginiaRegion
     Properties:
       DistributionConfig:
-        Aliases:
-          - !Ref DomainName
+        Aliases: !If
+          - HasDomainName
+          - - !Ref DomainName
+          - !Ref "AWS::NoValue"
         CacheBehaviors:
           - !If
             - HasApiOrigin
@@ -300,14 +405,14 @@ Resources:
             - HEAD
           CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
           Compress: true
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !Sub "arn:aws:cloudfront::${AWS::AccountId}:function/${DefaultIndexFunction}"
+            - EventType: viewer-response
+              FunctionARN: !Sub "arn:aws:cloudfront::${AWS::AccountId}:function/${WebSecurityFunction}"
           OriginRequestPolicyId: "acba4595-bd28-49b8-b9fe-13317c0390fa" # Managed-UserAgentRefererHeaders
           TargetOriginId: s3
           ViewerProtocolPolicy: redirect-to-https
-          LambdaFunctionAssociations:
-            - EventType: "origin-request"
-              LambdaFunctionARN: !Ref DefaultIndexLambdaFunction.Version
-            - EventType: "origin-response"
-              LambdaFunctionARN: !Ref WebSecurityLambdaFunction.Version
         DefaultRootObject: "index.html"
         Enabled: true
         HttpVersion: http2
@@ -350,10 +455,12 @@ Resources:
             S3OriginConfig:
               OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
         PriceClass: PriceClass_100
-        ViewerCertificate:
-          AcmCertificateArn: !Ref WebCertificate
-          MinimumProtocolVersion: TLSv1.2_2019
-          SslSupportMethod: sni-only
+        ViewerCertificate: !If
+          - HasDomainName
+          - AcmCertificateArn: !Ref WebCertificate
+            MinimumProtocolVersion: TLSv1.2_2019
+            SslSupportMethod: sni-only
+          - CloudFrontDefaultCertificate: true
 
   RedirectCloudFrontDistribution:
     Type: "AWS::CloudFront::Distribution"
@@ -389,14 +496,13 @@ Resources:
 
   CloudFrontOriginAccessIdentity:
     Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
-    Condition: NorthernVirginiaRegion
     Properties:
       CloudFrontOriginAccessIdentityConfig:
         Comment: "CloudFront OAI"
 
   WebRecordSetGroup:
     Type: "AWS::Route53::RecordSetGroup"
-    Condition: NorthernVirginiaRegion
+    Condition: HasDomainName
     Properties:
       HostedZoneId: !Ref HostedZoneId
       RecordSets:
@@ -436,35 +542,28 @@ Outputs:
   CloudFrontDistributionId:
     Description: CloudFront Distribution ID
     Value: !Ref CloudFrontDistribution
-    Condition: NorthernVirginiaRegion
   CloudFrontDomainName:
     Description: CloudFront Domain Name
     Value: !GetAtt CloudFrontDistribution.DomainName
-    Condition: NorthernVirginiaRegion
   CertificateArn:
     Description: SSL Certficate ARN
     Value: !Ref WebCertificate
+    Condition: HasDomainName
   WebBucketName:
     Description: Web S3 Bucket Name
     Value: !Ref WebBucket
-    Condition: NorthernVirginiaRegion
   WebBucketArn:
     Description: Web S3 Bucket ARN
     Value: !GetAtt WebBucket.Arn
-    Condition: NorthernVirginiaRegion
   WebBucketDomainName:
     Description: Web S3 Bucket Domain Name
     Value: !GetAtt WebBucket.RegionalDomainName
-    Condition: NorthernVirginiaRegion
   LogBucketName:
     Description: Log S3 Bucket Name
     Value: !Ref LogBucket
-    Condition: NorthernVirginiaRegion
   LogBucketArn:
     Description: Log S3 Bucket ARN
     Value: !GetAtt LogBucket.Arn
-    Condition: NorthernVirginiaRegion
   LogBucketDomainName:
     Description: Log S3 Bucket Domain Name
     Value: !GetAtt LogBucket.RegionalDomainName
-    Condition: NorthernVirginiaRegion
