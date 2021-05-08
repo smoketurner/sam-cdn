@@ -2,7 +2,7 @@
 [![build status](https://github.com/smoketurner/sam-cdn/workflows/Node%20CI/badge.svg)](https://github.com/smoketurner/sam-cdn/actions?query=workflow%3A%22Node+CI%22)
 [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/lambda/home?#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:860114833029:applications/cloudfront-cdn)
 
-[AWS Serverless Application Model](https://aws.amazon.com/serverless/sam/) project that deploys a content delivery network (CDN) using AWS CloudFront for static assets hosted in a private S3 bucket.
+A project that deploys a content delivery network (CDN) using AWS CloudFront for static assets hosted in a private S3 bucket.
 
 This project creates the following resources:
 
@@ -18,8 +18,8 @@ This project creates the following resources:
 - `AWS::S3::Bucket` - private static asset bucket
 - `AWS::S3::Bucket` - private bucket to redirect requests to `https://<domain>`
 - `AWS::S3::BucketPolicy` - only allow CloudFront to access static asset bucket
-- `AWS::Lambda::Function` - Lambda@Edge function for single page applications to redirect requests to `/index.html`
-- `AWS::Lambda::Function` - Lambda@Edge function to add various web security HTTP response headers
+- `AWS::CloudFront::Function` - CloudFront Function for single page applications to redirect requests to `/index.html`
+- `AWS::CloudFront::Function` - CloudFront Function to add various web security HTTP response headers
 
 ## Installation
 
@@ -27,12 +27,6 @@ This project creates the following resources:
 git clone https://github.com/smoketurner/sam-cdn.git
 cd sam-cdn
 npm install
-```
-
-## Run Tests
-
-```
-npm test
 ```
 
 ## Deploy
@@ -46,5 +40,7 @@ You can upload your static assets into the S3 bucket and Route53 and CloudFront 
 
 ## References
 
+- https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/example-function-add-index.html
+- https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/example-function-add-security-headers.html
 - https://www.awsadvent.com/2018/12/03/vanquishing-cors-with-cloudfront-and-lambdaedge/
 - https://medium.com/faun/hardening-the-http-security-headers-with-aws-lambda-edge-and-cloudfront-2e2da1ae4d83

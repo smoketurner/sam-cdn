@@ -1,7 +1,0 @@
-.git
-.aws-sam
-coverage
-node_modules
-package-lock.json
-packaged.yml
-template.yml
