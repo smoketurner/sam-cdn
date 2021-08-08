@@ -15,7 +15,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ["cdn", "cloudfront", "route53", "s3"]
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 2.0.1
+    SemanticVersion: 2.0.2
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
   "AWS::CloudFormation::Interface":
@@ -459,7 +459,7 @@ Resources:
         ViewerCertificate: !If
           - HasDomainName
           - AcmCertificateArn: !Ref WebCertificate
-            MinimumProtocolVersion: TLSv1.2_2019
+            MinimumProtocolVersion: TLSv1.2_2021
             SslSupportMethod: sni-only
           - CloudFrontDefaultCertificate: true
 
@@ -492,7 +492,7 @@ Resources:
         PriceClass: PriceClass_100
         ViewerCertificate:
           AcmCertificateArn: !Ref WebCertificate
-          MinimumProtocolVersion: TLSv1.2_2019
+          MinimumProtocolVersion: TLSv1.2_2021
           SslSupportMethod: sni-only
 
   CloudFrontOriginAccessIdentity:
