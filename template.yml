@@ -15,7 +15,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ["cdn", "cloudfront", "route53", "s3"]
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 2.0.2
+    SemanticVersion: 2.0.3
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
   "AWS::CloudFormation::Interface":
@@ -212,6 +212,8 @@ Resources:
 
   LogBucket:
     Type: "AWS::S3::Bucket"
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
     Properties:
       AccessControl: LogDeliveryWrite
       BucketEncryption:
@@ -226,6 +228,15 @@ Resources:
             Id: RetentionRule
             NoncurrentVersionExpirationInDays: !Ref LogRetentionDays
             Status: Enabled
+          - Id: TransitionRule
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 30
+              - StorageClass: GLACIER
+                TransitionInDays: 90
+              - StorageClass: DEEP_ARCHIVE
+                TransitionInDays: 180
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerPreferred
@@ -408,9 +419,9 @@ Resources:
           Compress: true
           FunctionAssociations:
             - EventType: viewer-request
-              FunctionARN: !Sub "arn:aws:cloudfront::${AWS::AccountId}:function/${DefaultIndexFunction}"
+              FunctionARN: !Ref DefaultIndexFunction
             - EventType: viewer-response
-              FunctionARN: !Sub "arn:aws:cloudfront::${AWS::AccountId}:function/${WebSecurityFunction}"
+              FunctionARN: !Ref WebSecurityFunction
           OriginRequestPolicyId: "acba4595-bd28-49b8-b9fe-13317c0390fa" # Managed-UserAgentRefererHeaders
           TargetOriginId: s3
           ViewerProtocolPolicy: redirect-to-https
