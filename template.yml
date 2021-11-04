@@ -15,7 +15,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ["cdn", "cloudfront", "route53", "s3"]
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 2.0.3
+    SemanticVersion: 2.1.0
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
   "AWS::CloudFormation::Interface":
@@ -25,8 +25,12 @@ Metadata:
         Parameters:
           - DomainName
           - HostedZoneId
-          - CreateRedirect
           - LogRetentionDays
+      - Label:
+          default: "Redirect Configuration"
+        Parameters:
+          - CreateRedirect
+          - RedirectSubdomain
       - Label:
           default: "API Origin Configuration"
         Parameters:
@@ -40,13 +44,17 @@ Metadata:
           - AppSyncOriginDomainName
     ParameterLabels:
       CreateRedirect:
-        default: "Redirect http(s)://www.<DomainName> to https://<DomainName>?"
+        default: "Redirect http(s)://<RedirectSubdomain>.<DomainName> to https://<DomainName>?"
 
 Parameters:
   DomainName:
     Type: String
     Default: ""
     Description: Optional domain name to use (leave blank for *.cloudfront.net)
+  RedirectSubdomain:
+    Type: String
+    Default: www
+    Description: Redirect subdomain
   HostedZoneId:
     Type: String
     Description: HostedZoneId for the Domain
@@ -74,7 +82,7 @@ Parameters:
   CreateRedirect:
     Type: String
     Default: "false"
-    Description: Set to 'true' to create a CloudFront distribution that redirects https://www.DomainName to https://DomainName
+    Description: Set to 'true' to create a CloudFront distribution that redirects https://<RedirectSubdomain>.<DomainName> to https://<DomainName>
     AllowedValues:
       - "true"
       - "false"
@@ -128,66 +136,45 @@ Resources:
         Runtime: cloudfront-js-1.0
       Name: default_index
 
-  WebSecurityFunction:
-    Type: "AWS::CloudFront::Function"
+  ResponseHeadersPolicy:
+    Type: "AWS::CloudFront::ResponseHeadersPolicy"
     Properties:
-      AutoPublish: true
-      FunctionCode: |-
-        function handler(event) {
-          var response = event.response;
-          var headers = response.headers;
-
-          var policies = [
-            'autoplay none',
-            'camera none',
-            'fullscreen self',
-            'geolocation none',
-            'gyroscope none',
-            'magnetometer none',
-            'midi none',
-            'microphone none',
-            'notifications none',
-            'payment none',
-            'push none',
-            'speaker self',
-            'sync-xhr none',
-            'vibrate none'
-          ];
-
-          headers['strict-transport-security'] = {
-            value: 'max-age=63072000; includeSubDomains; preload'
-          };
-          headers['content-security-policy'] = {
-            value: "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'"
-          };
-          headers['x-content-type-options'] = {
-            value: 'nosniff'
-          };
-          headers['referrer-policy'] = {
-            value: 'strict-origin-when-cross-origin'
-          };
-          headers['feature-policy'] = {
-            value: policies.join('; ')
-          };
-          headers['x-frame-options'] = {
-            value: 'DENY'
-          };
-          headers['x-xss-protection'] = {
-            value: '1; mode=block'
-          };
-
-          // opt-out of Google Chrome's FLoC
-          // @see https://plausible.io/blog/google-floc#how-to-opt-out-of-floc-as-a-web-developer-set-a-permissions-policy
-          headers['permissions-policy'] = {
-            value: 'interest-cohort=()'
-          };
-
-          return response;
-        }
-      FunctionConfig:
-        Comment: Viewer Response - Web Security
-        Runtime: cloudfront-js-1.0
-      Name: web_security
+      ResponseHeadersPolicyConfig:
+        Name: WebSecurity-Headers-Policy
+        Comment: Common web security response headers
+        CustomHeadersConfig:
+          Items:
+            # opt-out of Google Chrome's FLoC
+            # @see https://plausible.io/blog/google-floc#how-to-opt-out-of-floc-as-a-web-developer-set-a-permissions-policy
+            - Header: Permissions-Policy
+              Value: interest-cohort=()
+              Override: true
+            - Header: Feature-Policy
+              Value: autoplay none; camera none; fullscreen self; geolocation none; gyroscope none; magnetometer none; midi none; microphone none; notifications none; payment none; push none; speaker self; sync-xhr none; vibrate none'
+              Override: true
+          Quantity: 2
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            ContentSecurityPolicy: default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'
+            Override: false
+          ContentTypeOptions: # You don't need to specify a value for 'X-Content-Type-Options'.
+                              # Simply including it in the template sets its value to 'nosniff'.
+            Override: false
+          FrameOptions:
+            FrameOption: DENY
+            Override: false
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: false
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: true
+            Override: false
+          XSSProtection:
+            ModeBlock: true
+            Protection: true
+            Override: false
 
   WebCertificate:
     Type: "AWS::CertificateManager::Certificate"
@@ -200,7 +187,7 @@ Resources:
           HostedZoneId: !Ref HostedZoneId
         - !If
           - CreateRedirect
-          - DomainName: !Sub "www.${DomainName}"
+          - DomainName: !Sub "${RedirectSubdomain}.${DomainName}"
             HostedZoneId: !Ref HostedZoneId
           - !Ref "AWS::NoValue"
       SubjectAlternativeNames:
@@ -249,7 +236,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName} Logs"
       VersioningConfiguration:
-        Status: Suspended
+        Status: Enabled
 
   WebBucket:
     Type: "AWS::S3::Bucket"
@@ -330,7 +317,7 @@ Resources:
         RestrictPublicBuckets: true
       Tags:
         - Key: Name
-          Value: !Sub "www.${DomainName}"
+          Value: !Sub "${RedirectSubdomain}.${DomainName}"
 
   CloudFrontDistribution:
     Type: "AWS::CloudFront::Distribution"
@@ -420,8 +407,6 @@ Resources:
           FunctionAssociations:
             - EventType: viewer-request
               FunctionARN: !Ref DefaultIndexFunction
-            - EventType: viewer-response
-              FunctionARN: !Ref WebSecurityFunction
           OriginRequestPolicyId: "acba4595-bd28-49b8-b9fe-13317c0390fa" # Managed-UserAgentRefererHeaders
           TargetOriginId: s3
           ViewerProtocolPolicy: redirect-to-https
@@ -480,7 +465,7 @@ Resources:
     Properties:
       DistributionConfig:
         Aliases:
-          - !Sub "www.${DomainName}"
+          - !Sub "${RedirectSubdomain}.${DomainName}"
         DefaultCacheBehavior:
           AllowedMethods:
             - GET
@@ -541,13 +526,13 @@ Resources:
             DNSName: !GetAtt RedirectCloudFrontDistribution.DomainName
             EvaluateTargetHealth: false
             HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
-          Name: !Sub "www.${DomainName}"
+          Name: !Sub "${RedirectSubdomain}.${DomainName}"
           Type: A
         - AliasTarget:
             DNSName: !GetAtt RedirectCloudFrontDistribution.DomainName
             EvaluateTargetHealth: false
             HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
-          Name: !Sub "www.${DomainName}"
+          Name: !Sub "${RedirectSubdomain}.${DomainName}"
           Type: AAAA
 
 Outputs:
