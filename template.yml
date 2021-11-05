@@ -151,21 +151,20 @@ Resources:
               Override: true
             - Header: Feature-Policy
               Value: autoplay none; camera none; fullscreen self; geolocation none; gyroscope none; magnetometer none; midi none; microphone none; notifications none; payment none; push none; speaker self; sync-xhr none; vibrate none'
-              Override: true
-          Quantity: 2
+              Override: false
         SecurityHeadersConfig:
           ContentSecurityPolicy:
             ContentSecurityPolicy: default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'
             Override: false
           ContentTypeOptions: # You don't need to specify a value for 'X-Content-Type-Options'.
                               # Simply including it in the template sets its value to 'nosniff'.
-            Override: false
+            Override: true
           FrameOptions:
             FrameOption: DENY
-            Override: false
+            Override: true
           ReferrerPolicy:
             ReferrerPolicy: strict-origin-when-cross-origin
-            Override: false
+            Override: true
           StrictTransportSecurity:
             AccessControlMaxAgeSec: 63072000
             IncludeSubdomains: true
@@ -174,7 +173,7 @@ Resources:
           XSSProtection:
             ModeBlock: true
             Protection: true
-            Override: false
+            Override: true
 
   WebCertificate:
     Type: "AWS::CertificateManager::Certificate"
@@ -408,6 +407,7 @@ Resources:
             - EventType: viewer-request
               FunctionARN: !Ref DefaultIndexFunction
           OriginRequestPolicyId: "acba4595-bd28-49b8-b9fe-13317c0390fa" # Managed-UserAgentRefererHeaders
+          ResponseHeadersPolicyId: !Ref ResponseHeadersPolicy
           TargetOriginId: s3
           ViewerProtocolPolicy: redirect-to-https
         DefaultRootObject: "index.html"
@@ -495,7 +495,7 @@ Resources:
     Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: "CloudFront OAI"
+        Comment: !Ref "AWS::StackName"
 
   WebRecordSetGroup:
     Type: "AWS::Route53::RecordSetGroup"
