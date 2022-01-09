@@ -150,7 +150,7 @@ Resources:
               Value: interest-cohort=()
               Override: true
             - Header: Feature-Policy
-              Value: autoplay none; camera none; fullscreen self; geolocation none; gyroscope none; magnetometer none; midi none; microphone none; notifications none; payment none; push none; speaker self; sync-xhr none; vibrate none'
+              Value: autoplay none; camera none; fullscreen self; geolocation none; gyroscope none; magnetometer none; midi none; microphone none; notifications none; payment none; push none; speaker self; sync-xhr none; vibrate none
               Override: false
         SecurityHeadersConfig:
           ContentSecurityPolicy:
