@@ -240,7 +240,6 @@ Resources:
   WebBucket:
     Type: "AWS::S3::Bucket"
     Properties:
-      AccessControl: Private
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -257,7 +256,7 @@ Resources:
           - !Sub "AWSLogs/${AWS::AccountId}/S3/web-${AWS::AccountId}-${AWS::Region}/"
       OwnershipControls:
         Rules:
-          - ObjectOwnership: BucketOwnerPreferred
+          - ObjectOwnership: BucketOwnerEnforced
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -291,7 +290,7 @@ Resources:
               - !GetAtt WebBucket.Arn
             Condition:
               Bool:
-                "aws:SecureTransport": "false"
+                "aws:SecureTransport": false
 
   RedirectBucket:
     Type: "AWS::S3::Bucket"
