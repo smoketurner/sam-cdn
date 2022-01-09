@@ -296,7 +296,6 @@ Resources:
     Type: "AWS::S3::Bucket"
     Condition: CreateRedirect
     Properties:
-      AccessControl: Private
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -307,7 +306,7 @@ Resources:
           Protocol: https
       OwnershipControls:
         Rules:
-          - ObjectOwnership: BucketOwnerPreferred
+          - ObjectOwnership: BucketOwnerEnforced
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
