@@ -1,5 +1,4 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Transform: "AWS::Serverless-2016-10-31"
 Description: >
   AWS project to deploy a CDN for hosting static assets in private S3 buckets
 
@@ -15,7 +14,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ["cdn", "cloudfront", "route53", "s3"]
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 2.1.0
+    SemanticVersion: 2.2.0
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
   "AWS::CloudFormation::Interface":
@@ -26,6 +25,7 @@ Metadata:
           - DomainName
           - HostedZoneId
           - LogRetentionDays
+          - Environment
       - Label:
           default: "Redirect Configuration"
         Parameters:
@@ -51,6 +51,10 @@ Parameters:
     Type: String
     Default: ""
     Description: Optional domain name to use (leave blank for *.cloudfront.net)
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment tag value
   RedirectSubdomain:
     Type: String
     Default: www
@@ -115,6 +119,7 @@ Resources:
     Type: "AWS::CloudFront::Function"
     Properties:
       AutoPublish: true
+      # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/example-function-add-index.html
       FunctionCode: |-
         function handler(event) {
           var request = event.request;
@@ -136,6 +141,26 @@ Resources:
         Runtime: cloudfront-js-1.0
       Name: default_index
 
+  TrueClientIpFunction:
+    Type: "AWS::CloudFront::Function"
+    Properties:
+      AutoPublish: true
+      # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/example-function-add-true-client-ip-header.html
+      FunctionCode: |-
+        function handler(event) {
+          var request = event.request;
+          var clientIP = event.viewer.ip;
+
+          // Add the true-client-ip header to the incoming request
+          request.headers['true-client-ip'] = { value: clientIP };
+
+          return request;
+        }
+      FunctionConfig:
+        Comment: Viewer Request - True-Client-IP
+        Runtime: cloudfront-js-1.0
+      Name: true_client_ip
+
   ResponseHeadersPolicy:
     Type: "AWS::CloudFront::ResponseHeadersPolicy"
     Properties:
@@ -147,11 +172,8 @@ Resources:
             # opt-out of Google Chrome's FLoC
             # @see https://plausible.io/blog/google-floc#how-to-opt-out-of-floc-as-a-web-developer-set-a-permissions-policy
             - Header: Permissions-Policy
-              Value: interest-cohort=()
+              Value: accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), execution-while-not-rendered=(), execution-while-out-of-viewport=(), fullscreen=(self), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), navigation-override=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=(), clipboard-read=(), clipboard-write=(), gamepad=(), speaker-selection=(), conversion-measurement=(), focus-without-user-activation=(), hid=(), idle-detection=(), interest-cohort=(), serial=(), sync-script=(), trust-token-redemption=(), window-placement=(), vertical-scroll=()
               Override: true
-            - Header: Feature-Policy
-              Value: autoplay none; camera none; fullscreen self; geolocation none; gyroscope none; magnetometer none; midi none; microphone none; notifications none; payment none; push none; speaker self; sync-xhr none; vibrate none
-              Override: false
         SecurityHeadersConfig:
           ContentSecurityPolicy:
             ContentSecurityPolicy: default-src 'none'; img-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'
@@ -174,6 +196,8 @@ Resources:
             ModeBlock: true
             Protection: true
             Override: true
+        ServerTimingHeadersConfig:
+          Enabled: false
 
   WebCertificate:
     Type: "AWS::CertificateManager::Certificate"
@@ -195,11 +219,18 @@ Resources:
       Tags:
         - Key: Name
           Value: !Ref DomainName
+        - Key: Environment
+          Value: !Ref Environment
 
   LogBucket:
     Type: "AWS::S3::Bucket"
     UpdateReplacePolicy: Retain
     DeletionPolicy: Retain
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: "Ignore access logging"
     Properties:
       AccessControl: LogDeliveryWrite
       BucketEncryption:
@@ -225,7 +256,7 @@ Resources:
                 TransitionInDays: 180
       OwnershipControls:
         Rules:
-          - ObjectOwnership: BucketOwnerPreferred
+          - ObjectOwnership: BucketOwnerPreferred # can't use BucketOwnerEnforced with LogDeliveryWrite
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -234,8 +265,26 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AWS::StackName} Logs"
+        - Key: Environment
+          Value: !Ref Environment
       VersioningConfiguration:
         Status: Enabled
+
+  LogBucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref LogBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !Sub "${LogBucket.Arn}/*"
+              - !GetAtt LogBucket.Arn
+            Condition:
+              Bool:
+                "aws:SecureTransport": false
 
   WebBucket:
     Type: "AWS::S3::Bucket"
@@ -268,6 +317,8 @@ Resources:
             - HasDomainName
             - !Ref DomainName
             - !Sub "web-${AWS::AccountId}-${AWS::Region}"
+        - Key: Environment
+          Value: !Ref Environment
       VersioningConfiguration:
         Status: Enabled
 
@@ -277,11 +328,15 @@ Resources:
       Bucket: !Ref WebBucket
       PolicyDocument:
         Statement:
-          - Effect: Allow
+          - Sid: AllowCloudFrontServicePrincipalReadOnly
+            Effect: Allow
             Principal:
-              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+              Service: !Sub "cloudfront.${AWS::URLSuffix}"
             Action: "s3:GetObject"
             Resource: !Sub "${WebBucket.Arn}/*"
+            Condition:
+              ArnEquals:
+                "aws:SourceArn": !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
           - Effect: Deny
             Principal: "*"
             Action: "s3:*"
@@ -295,6 +350,13 @@ Resources:
   RedirectBucket:
     Type: "AWS::S3::Bucket"
     Condition: CreateRedirect
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: "Ignore access logging"
+          - id: W51
+            reason: "Ignore bucket policy"
     Properties:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
@@ -315,6 +377,8 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${RedirectSubdomain}.${DomainName}"
+        - Key: Environment
+          Value: !Ref Environment
 
   CloudFrontDistribution:
     Type: "AWS::CloudFront::Distribution"
@@ -338,19 +402,20 @@ Resources:
               # CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
               Compress: true
               ForwardedValues:
-                Headers:
-                  - Accept
-                  - Authorization
-                  - Content-Type
-                  - Origin
-                  - Referer
+                Cookies:
+                  Forward: none
+                Headers: ["*"] # send all request headers to origin
                 QueryString: true
+              FunctionAssociations:
+                - EventType: viewer-request
+                  FunctionARN: !Ref TrueClientIpFunction
               MaxTTL: 0
               MinTTL: 0
               DefaultTTL: 0
               # Can't use Managed-AllViewer because it sends the Host header
               # OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
               PathPattern: !Sub "${ApiPath}*"
+              ResponseHeadersPolicyId: !Ref ResponseHeadersPolicy
               TargetOriginId: api
               ViewerProtocolPolicy: redirect-to-https
             - !Ref "AWS::NoValue"
@@ -367,19 +432,20 @@ Resources:
               # CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
               Compress: true
               ForwardedValues:
-                Headers:
-                  - Accept
-                  - Authorization
-                  - Content-Type
-                  - Origin
-                  - Referer
+                Cookies:
+                  Forward: none
+                Headers: ["*"] # send all request headers to origin
                 QueryString: true
+              FunctionAssociations:
+                - EventType: viewer-request
+                  FunctionARN: !Ref TrueClientIpFunction
               MaxTTL: 0
               MinTTL: 0
               DefaultTTL: 0
               # Can't use Managed-AllViewer because it sends the Host header
               # OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
               PathPattern: "/graphql*"
+              ResponseHeadersPolicyId: !Ref ResponseHeadersPolicy
               TargetOriginId: appsync
               ViewerProtocolPolicy: redirect-to-https
             - !Ref "AWS::NoValue"
@@ -410,7 +476,7 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
         DefaultRootObject: "index.html"
         Enabled: true
-        HttpVersion: http2
+        HttpVersion: http2and3
         IPV6Enabled: true
         Logging:
           Bucket: !GetAtt LogBucket.DomainName
@@ -447,8 +513,8 @@ Resources:
             ConnectionAttempts: 3 # default
             ConnectionTimeout: 10 # seconds
             DomainName: !GetAtt WebBucket.RegionalDomainName
-            S3OriginConfig:
-              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}"
+            OriginAccessControlId: !Ref CloudFrontOriginAccessControl
+            S3OriginConfig: {}
         PriceClass: PriceClass_100
         ViewerCertificate: !If
           - HasDomainName
@@ -456,10 +522,23 @@ Resources:
             MinimumProtocolVersion: TLSv1.2_2021
             SslSupportMethod: sni-only
           - CloudFrontDefaultCertificate: true
+      Tags:
+        - !If
+          - HasDomainName
+          - Key: Name
+            Value: !Ref DomainName
+          - !Ref "AWS::NoValue"
+        - Key: Environment
+          Value: !Ref Environment
 
   RedirectCloudFrontDistribution:
     Type: "AWS::CloudFront::Distribution"
     Condition: CreateRedirect
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W10
+            reason: "Ignore access logging"
     Properties:
       DistributionConfig:
         Aliases:
@@ -474,7 +553,7 @@ Resources:
           TargetOriginId: s3
           ViewerProtocolPolicy: redirect-to-https
         Enabled: true
-        HttpVersion: http2
+        HttpVersion: http2and3
         IPV6Enabled: true
         Origins:
           - Id: s3
@@ -488,12 +567,21 @@ Resources:
           AcmCertificateArn: !Ref WebCertificate
           MinimumProtocolVersion: TLSv1.2_2021
           SslSupportMethod: sni-only
+      Tags:
+        - Key: Name
+          Value: !Sub "${RedirectSubdomain}.${DomainName}"
+        - Key: Environment
+          Value: !Ref Environment
 
-  CloudFrontOriginAccessIdentity:
-    Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
+  CloudFrontOriginAccessControl:
+    Type: "AWS::CloudFront::OriginAccessControl"
     Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: !Ref "AWS::StackName"
+      OriginAccessControlConfig:
+        Description: !Ref "AWS::StackName"
+        Name: !Ref "AWS::StackName"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
 
   WebRecordSetGroup:
     Type: "AWS::Route53::RecordSetGroup"

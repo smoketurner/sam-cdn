@@ -1,0 +1,6 @@
+repos:
+  - repo: https://github.com/aws-cloudformation/cfn-lint
+    rev: v0.68.0
+    hooks:
+      - id: cfn-python-lint
+        files: template.yml
