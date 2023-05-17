@@ -168,6 +168,21 @@ Resources:
       ResponseHeadersPolicyConfig:
         Name: WebSecurity-Headers-Policy
         Comment: Common web security response headers
+        CorsConfig:
+          AccessControlAllowCredentials: false
+          AccessControlAllowHeaders:
+            Items:
+              - "*"
+          AccessControlAllowMethods:
+            Items:
+              - ALL
+          AccessControlAllowOrigins:
+            Items:
+              - "*"
+          AccessControlExposeHeaders:
+            Items:
+              - "*"
+          OriginOverride: true
         CustomHeadersConfig:
           Items:
             # opt-out of Google Chrome's FLoC
@@ -400,21 +415,12 @@ Resources:
                 - PATCH
                 - POST
                 - DELETE
-              # CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+              CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
               Compress: true
-              ForwardedValues:
-                Cookies:
-                  Forward: none
-                Headers: ["*"] # send all request headers to origin
-                QueryString: true
               FunctionAssociations:
                 - EventType: viewer-request
                   FunctionARN: !Ref TrueClientIpFunction
-              MaxTTL: 0
-              MinTTL: 0
-              DefaultTTL: 0
-              # Can't use Managed-AllViewer because it sends the Host header
-              # OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
+              OriginRequestPolicyId: "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
               PathPattern: !Sub "${ApiPath}*"
               ResponseHeadersPolicyId: !Ref ResponseHeadersPolicy
               TargetOriginId: api
@@ -430,21 +436,12 @@ Resources:
                 - PATCH
                 - POST
                 - DELETE
-              # CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
+              CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
               Compress: true
-              ForwardedValues:
-                Cookies:
-                  Forward: none
-                Headers: ["*"] # send all request headers to origin
-                QueryString: true
               FunctionAssociations:
                 - EventType: viewer-request
                   FunctionARN: !Ref TrueClientIpFunction
-              MaxTTL: 0
-              MinTTL: 0
-              DefaultTTL: 0
-              # Can't use Managed-AllViewer because it sends the Host header
-              # OriginRequestPolicyId: "216adef6-5c7f-47e4-b989-5492eafa07d3" # Managed-AllViewer
+              OriginRequestPolicyId: "b689b0a8-53d0-40ab-baf2-68738e2966ac" # Managed-AllViewerExceptHostHeader
               PathPattern: "/graphql*"
               ResponseHeadersPolicyId: !Ref ResponseHeadersPolicy
               TargetOriginId: appsync
@@ -463,15 +460,17 @@ Resources:
           AllowedMethods:
             - GET
             - HEAD
+            - OPTIONS
           CachedMethods:
             - GET
             - HEAD
+            - OPTIONS
           CachePolicyId: "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
           Compress: true
           FunctionAssociations:
             - EventType: viewer-request
               FunctionARN: !Ref DefaultIndexFunction
-          OriginRequestPolicyId: "acba4595-bd28-49b8-b9fe-13317c0390fa" # Managed-UserAgentRefererHeaders
+          OriginRequestPolicyId: "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf" # Managed-CORS-S3Origin
           ResponseHeadersPolicyId: !Ref ResponseHeadersPolicy
           TargetOriginId: s3
           ViewerProtocolPolicy: redirect-to-https
