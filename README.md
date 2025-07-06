@@ -12,8 +12,10 @@ This project creates the following resources:
 - `AWS::CloudFront::CloudFrontOriginAccessIdentity`
 - `AWS::Route53::RecordSet` - `<domain>` IPv4 DNS entry
 - `AWS::Route53::RecordSet` - `<domain>` IPv6 DNS entry
+- `AWS::Route53::RecordSet` - `<domain>` HTTPS DNS entry
 - `AWS::Route53::RecordSet` - `www.<domain>` IPv4 DNS entry
 - `AWS::Route53::RecordSet` - `www.<domain>` IPv6 DNS entry
+- `AWS::Route53::RecordSet` - `www.<domain>` HTTPS DNS entry
 - `AWS::S3::Bucket` - private access log bucket
 - `AWS::S3::Bucket` - private static asset bucket
 - `AWS::S3::Bucket` - private bucket to redirect requests to `https://<domain>`
@@ -38,9 +40,20 @@ npm run deploy
 
 You can upload your static assets into the S3 bucket and Route53 and CloudFront will take care of any redirections and content serving for you.
 
+## HTTPS DNS Records
+
+This project now supports HTTPS DNS records (Type 65) for CloudFront distributions with custom domain names. HTTPS DNS records provide the following benefits:
+
+- **Improved Performance**: Reduces connection setup time by eliminating the need for separate DNS lookups and connection upgrades
+- **Enhanced Security**: Provides secure connection information directly through DNS
+- **Optimized Connection Setup**: Clients can obtain connection information (including HTTPS parameters) in a single DNS lookup
+
+HTTPS DNS records are automatically configured for both the main domain and any redirect subdomains when you provide a custom domain name.
+
 ## References
 
 - https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/example-function-add-index.html
 - https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/example-function-add-security-headers.html
 - https://www.awsadvent.com/2018/12/03/vanquishing-cors-with-cloudfront-and-lambdaedge/
 - https://medium.com/faun/hardening-the-http-security-headers-with-aws-lambda-edge-and-cloudfront-2e2da1ae4d83
+- https://aws.amazon.com/blogs/networking-and-content-delivery/boost-application-performance-amazon-cloudfront-enables-https-record/

@@ -1,12 +1,15 @@
 {
   "name": "sam-cdn",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "scripts": {
     "build": "sam build --region us-east-1 --cached --parallel",
     "deploy": "sam deploy --guided",
     "package": "sam package --template-file template.yml --output-template-file packaged.yml --s3-bucket smoketurner-sam",
-    "publish": "sam publish --template packaged.yml --region us-east-1"
+    "publish": "sam publish --template packaged.yml --region us-east-1",
+    "test": "node test-https-dns.js"
   },
-  "dependencies": {}
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
 }
