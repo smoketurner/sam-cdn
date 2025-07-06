@@ -15,7 +15,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ["cdn", "cloudfront", "route53", "s3"]
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 2.2.0
+    SemanticVersion: 2.3.0
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
   "AWS::CloudFormation::Interface":
@@ -601,6 +601,12 @@ Resources:
             HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
           Name: !Ref DomainName
           Type: AAAA
+        - AliasTarget:
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
+            EvaluateTargetHealth: false
+            HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
+          Name: !Ref DomainName
+          Type: HTTPS
 
   RedirectRecordSetGroup:
     Type: "AWS::Route53::RecordSetGroup"
@@ -620,6 +626,12 @@ Resources:
             HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
           Name: !Sub "${RedirectSubdomain}.${DomainName}"
           Type: AAAA
+        - AliasTarget:
+            DNSName: !GetAtt RedirectCloudFrontDistribution.DomainName
+            EvaluateTargetHealth: false
+            HostedZoneId: Z2FDTNDATAQYW2 # CloudFront hosted zone ID
+          Name: !Sub "${RedirectSubdomain}.${DomainName}"
+          Type: HTTPS
 
 Outputs:
   CloudFrontDistributionId:
