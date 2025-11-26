@@ -15,7 +15,7 @@ Metadata:
     ReadmeUrl: README.md
     Labels: ["cdn", "cloudfront", "route53", "s3"]
     HomePageUrl: https://github.com/smoketurner/sam-cdn
-    SemanticVersion: 2.3.0
+    SemanticVersion: 2.4.0
     SourceCodeUrl: https://github.com/smoketurner/sam-cdn
 
   "AWS::CloudFormation::Interface":
