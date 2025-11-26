@@ -257,9 +257,12 @@ Resources:
         Rules:
           - AbortIncompleteMultipartUpload:
               DaysAfterInitiation: 1
-            ExpirationInDays: !Ref LogRetentionDays
+            Id: ExpireNonCurrentAndIncompleteMultipartUpload
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+            Status: Enabled
+          - ExpirationInDays: !Ref LogRetentionDays
             Id: RetentionRule
-            NoncurrentVersionExpirationInDays: !Ref LogRetentionDays
             Status: Enabled
           - Id: TransitionRule
             Status: Enabled
@@ -515,11 +518,10 @@ Resources:
             DomainName: !GetAtt WebBucket.RegionalDomainName
             OriginAccessControlId: !Ref CloudFrontOriginAccessControl
             S3OriginConfig: {}
-        PriceClass: PriceClass_100
         ViewerCertificate: !If
           - HasDomainName
           - AcmCertificateArn: !Ref WebCertificate
-            MinimumProtocolVersion: TLSv1.2_2021
+            MinimumProtocolVersion: TLSv1.2_2025
             SslSupportMethod: sni-only
           - CloudFrontDefaultCertificate: true
       Tags:
@@ -562,10 +564,9 @@ Resources:
             DomainName: !Sub "${RedirectBucket}.s3-website-${AWS::Region}.amazonaws.com"
             CustomOriginConfig:
               OriginProtocolPolicy: http-only # private bucket access only works over HTTP
-        PriceClass: PriceClass_100
         ViewerCertificate:
           AcmCertificateArn: !Ref WebCertificate
-          MinimumProtocolVersion: TLSv1.2_2021
+          MinimumProtocolVersion: TLSv1.2_2025
           SslSupportMethod: sni-only
       Tags:
         - Key: Name
